@@ -1,0 +1,330 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ======================== ENUMS ========================
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN_ORG
+  ADHERENT
+}
+
+enum TypeOrg {
+  ONG
+  MUTUELLE
+  ASSOCIATION
+}
+
+enum StatutOrg {
+  EN_ATTENTE
+  ACTIVE
+  INACTIVE
+  SUSPENDUE
+}
+
+enum StatutAdherent {
+  EN_ATTENTE
+  VALIDE
+  ACTIF
+  REFUSE
+  INACTIF
+}
+
+enum StatutAbonnement {
+  ACTIF
+  ESSAI
+  EXPIRE
+  ANNULE
+}
+
+enum PeriodeAbonnement {
+  MOIS
+  TRIMESTRE
+  SEMESTRE
+  ANNEE
+}
+
+enum ModePaiement {
+  MOBILE_MONEY
+  CARTE
+  CHEQUE
+  VIREMENT
+}
+
+enum StatutPaiement {
+  EN_ATTENTE
+  CONFIRME
+  ECHOUE
+  REMBOURSE
+}
+
+enum TypePiece {
+  CNI
+  PASSEPORT
+  PERMIS
+  CARTE_RESIDENT
+  AUTRE
+}
+
+// ======================== MODELES ========================
+
+model Pays {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  nom       String
+  drapeau   String?
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  villes        Ville[]
+  organisations Organisation[]
+
+  @@map("GPOTB26")
+}
+
+model Ville {
+  id     String @id @default(uuid())
+  nom    String
+  paysId String
+  pays   Pays   @relation(fields: [paysId], references: [id])
+
+  organisations Organisation[]
+  adherents     Adherent[]
+
+  @@unique([nom, paysId])
+  @@map("GPOTB40")
+}
+
+model Utilisateur {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  motDePasse        String
+  role              Role      @default(ADHERENT)
+  actif             Boolean   @default(true)
+  emailVerifie      Boolean   @default(false)
+  tokenVerif        String?
+  tokenReset        String?
+  tokenResetExp     DateTime?
+  derniereConnexion DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  adherent  Adherent?
+  adminOrgs AdminOrganisation[]
+
+  @@map("GPOTB27")
+}
+
+model Organisation {
+  id           String    @id @default(uuid())
+  code         String    @unique
+  nom          String
+  sigle        String?
+  type         TypeOrg
+  statut       StatutOrg @default(EN_ATTENTE)
+  dateCreation DateTime?
+  description  String?
+  secteurs     String[]
+  logoUrl      String?
+
+  paysId    String?
+  pays      Pays?  @relation(fields: [paysId], references: [id])
+  villeId   String?
+  ville     Ville? @relation(fields: [villeId], references: [id])
+  adresse   String?
+  email     String
+  telephone String
+  siteWeb   String?
+
+  // Responsable legal
+  responsableNom        String
+  responsablePrenom     String
+  responsableFonction   String
+  responsableEmail      String?
+  responsableTelephone  String?
+  responsablePhotoUrl   String?
+  typePiece             TypePiece?
+  numeroPiece           String?
+  pieceRectoUrl         String?
+  pieceVersoUrl         String?
+  situationMatrimoniale String?
+
+  // ONG
+  ongNumeroAgrement      String?
+  ongDomaineIntervention String?
+  ongZoneIntervention    String?
+  ongPartenaires         String?
+  ongBudgetAnnuel        String?
+  ongSourceFinancement   String?
+  ongDocumentAgrementUrl String?
+
+  // Mutuelle
+  mutNumeroImmatriculation String?
+  mutTypeMutuelle          String?
+  mutCotisationMontant     String?
+  mutCotisationPeriode     String?
+  mutPrestations           String[]
+  mutZoneCouverture        String?
+  mutNombreBeneficiaires   String?
+  mutBanquePartenaire      String?
+  mutDocumentUrl           String?
+
+  // Association
+  assocNumeroRecepisse      String?
+  assocTypeAssociation      String?
+  assocActivitesPrincipales String?
+  assocSourcesFinancement   String[]
+  assocDocumentAgrementUrl  String?
+  assocReglementUrl         String?
+
+  rapportIA String?
+  scoreIA   Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  admins     AdminOrganisation[]
+  adherents  Adherent[]
+  abonnement Abonnement?
+  paiements  Paiement[]
+  documents  Document[]
+
+  @@map("GPOTB24")
+}
+
+model AdminOrganisation {
+  id             String       @id @default(uuid())
+  utilisateurId  String
+  utilisateur    Utilisateur  @relation(fields: [utilisateurId], references: [id])
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  createdAt      DateTime     @default(now())
+
+  @@unique([utilisateurId, organisationId])
+  @@map("GPOTB39")
+}
+
+model Adherent {
+  id             String         @id @default(uuid())
+  utilisateurId  String         @unique
+  utilisateur    Utilisateur    @relation(fields: [utilisateurId], references: [id])
+  organisationId String
+  organisation   Organisation   @relation(fields: [organisationId], references: [id])
+  statut         StatutAdherent @default(EN_ATTENTE)
+
+  nom          String
+  prenom       String
+  dateNaissance DateTime?
+  genre        String?
+  telephone    String?
+  photoUrl     String?
+
+  villeId  String?
+  ville    Ville? @relation(fields: [villeId], references: [id])
+  quartier String?
+
+  profession String?
+  employeur  String?
+
+  typePiece           TypePiece?
+  numeroPiece         String?
+  dateDelivrancePiece DateTime?
+  lieuDelivrancePiece String?
+  pieceRectoUrl       String?
+  pieceVersoUrl       String?
+
+  interets   String[]
+  motivation String?
+
+  accepteReglement       Boolean @default(false)
+  accepteConfidentialite Boolean @default(false)
+
+  dateValidation DateTime?
+  motifRefus     String?
+  tokenPaiements TokenPaiement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organisationId, statut])
+  @@map("GPOTB01")
+}
+
+model Abonnement {
+  id              String            @id @default(uuid())
+  organisationId  String            @unique
+  organisation    Organisation      @relation(fields: [organisationId], references: [id])
+  statut          StatutAbonnement  @default(ESSAI)
+  periode         PeriodeAbonnement @default(MOIS)
+  montant         Int
+  dateDebut       DateTime          @default(now())
+  dateFin         DateTime
+  essaiExpiration DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@map("GPOTB41")
+}
+
+model Paiement {
+  id             String            @id @default(uuid())
+  organisationId String
+  organisation   Organisation      @relation(fields: [organisationId], references: [id])
+  montant        Int
+  periode        PeriodeAbonnement
+  mode           ModePaiement
+  statut         StatutPaiement    @default(EN_ATTENTE)
+  reference      String            @unique
+
+  operateur      String?
+  numeroMobile   String?
+  derniers4      String?
+  banqueCheque   String?
+  numeroCheque   String?
+  banqueVirement    String?
+  referenceVirement String?
+
+  externalId   String?
+  externalData Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organisationId, statut])
+  @@map("GPOTB25")
+}
+
+model Document {
+  id             String       @id @default(uuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  nom            String
+  type           String
+  url            String
+  taille         Int?
+  createdAt      DateTime     @default(now())
+
+  @@map("GPOTB42")
+}
+
+model TokenPaiement {
+  id             String            @id @default(uuid())
+  token          String            @unique @default(uuid())
+  email          String
+  organisationId String?
+  adherentId     String?
+  adherent       Adherent?         @relation(fields: [adherentId], references: [id])
+  montant        Int
+  periode        PeriodeAbonnement
+  utilise        Boolean           @default(false)
+  expireAt       DateTime
+  createdAt      DateTime          @default(now())
+
+  @@map("GPOTB43")
+}
