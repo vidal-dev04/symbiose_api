@@ -16,8 +16,9 @@ export class AdherentsController {
 
   @Get()
   @Roles(Role.SUPER_ADMIN, Role.ADMIN_ORG)
-  findByOrganisation(@Query('organisationId') organisationId: string) {
-    return this.service.findByOrganisation(organisationId);
+  find(@Query('organisationId') organisationId?: string) {
+    if (organisationId) return this.service.findByOrganisation(organisationId);
+    return this.service.findAll();
   }
 
   @Get(':id')

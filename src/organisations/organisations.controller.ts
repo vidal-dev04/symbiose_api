@@ -29,6 +29,18 @@ export class OrganisationsController {
     return this.service.stats();
   }
 
+  @Get('analyse-ia')
+  @Roles(Role.SUPER_ADMIN)
+  analyseIaAll() {
+    return this.service.analyseIaAll();
+  }
+
+  @Post(':id/analyser-ia')
+  @Roles(Role.SUPER_ADMIN)
+  analyserIa(@Param('id') id: string) {
+    return this.service.analyserOrganisationIA(id);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);

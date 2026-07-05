@@ -35,6 +35,22 @@ enum StatutAdherent {
   INACTIF
 }
 
+enum StatutMembre {
+  EN_ATTENTE
+  ACTIF
+  SUSPENDU
+  EXCLU
+}
+
+enum RoleInterne {
+  ADHERENT
+  PRESIDENT
+  VICE_PRESIDENT
+  SECRETAIRE
+  TRESORIER
+  COMMISSAIRE
+}
+
 enum StatutAbonnement {
   ACTIF
   ESSAI
@@ -74,13 +90,14 @@ enum TypePiece {
 // ======================== MODELES ========================
 
 model Pays {
-  id        String   @id @default(uuid())
-  code      String   @unique
-  nom       String
-  drapeau   String?
-  actif     Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(uuid())
+  code        String   @unique
+  nom         String
+  drapeau     String?
+  armoirieUrl String?
+  actif       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   villes        Ville[]
   organisations Organisation[]
@@ -117,6 +134,13 @@ model Utilisateur {
 
   adherent  Adherent?
   adminOrgs AdminOrganisation[]
+
+  connexions      Connexion[]
+  messagesEnvoyes Message[]       @relation("messageExp")
+  messagesRecus   Message[]       @relation("messageDest")
+  notifications   Notification[]
+  pistesAudit     PisteAudit[]
+  administrateur  Administrateur?
 
   @@map("GPOTB27")
 }
@@ -195,6 +219,27 @@ model Organisation {
   paiements  Paiement[]
   documents  Document[]
 
+  avoirs               Avoir[]
+  documentsOfficiels   DocumentOfficiel[]
+  cotisations          Cotisation[]
+  decaissements        Decaissement[]
+  dons                 Don[]
+  evenements           Evenement[]
+  filiationsParent     Filiation[]             @relation("orgParent")
+  filiationsEnfant     Filiation[]             @relation("orgEnfant")
+  fonctions            Fonction[]
+  groupes              GroupeAdherent[]
+  messages             Message[]
+  newsletters          Newsletter[]
+  prestations          Prestation[]
+  projets              Projet[]
+  rolesPerso           RolePersonnalise[]
+  demandesInscription  DemandeInscription[]
+  references           ReferenceOrganisation[]
+  transactions         Transaction[]
+  caisses              Caisse[]
+  membres              MembreOrganisation[]
+
   @@map("GPOTB24")
 }
 
@@ -249,11 +294,43 @@ model Adherent {
   motifRefus     String?
   tokenPaiements TokenPaiement[]
 
+  beneficiaires        Beneficiaire[]
+  cotisations          Cotisation[]
+  relationsSource      RelationAdherent[]   @relation("adherentSource")
+  relationsCible       RelationAdherent[]   @relation("adherentCible")
+  participations       EvenementProduit[]
+  habitation           Habitation?
+  occupations          Occuper[]
+  demandesInscription  DemandeInscription[]
+  appartenancesGroupes AppartenanceGroupe[]
+
+  membres              MembreOrganisation[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([organisationId, statut])
   @@map("GPOTB01")
+}
+
+// ======================== GPOTB02 — Appartenance multi-org ========================
+model MembreOrganisation {
+  id             String        @id @default(uuid())
+  adherentId     String
+  adherent       Adherent      @relation(fields: [adherentId], references: [id])
+  organisationId String
+  organisation   Organisation  @relation(fields: [organisationId], references: [id])
+  statut         StatutMembre  @default(EN_ATTENTE)
+  roleInterne    RoleInterne   @default(ADHERENT)
+  dateAdhesion   DateTime      @default(now())
+  dateAcceptation DateTime?
+  acceptePar     String?
+  motifRefus     String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([adherentId, organisationId])
+  @@map("membre_organisation")
 }
 
 model Abonnement {
@@ -327,4 +404,519 @@ model TokenPaiement {
   createdAt      DateTime          @default(now())
 
   @@map("GPOTB43")
+}
+
+// ======================== GPOTB02 — Administrateur ========================
+model Administrateur {
+  id            String      @id @default(uuid())
+  utilisateurId String      @unique
+  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
+  nom           String
+  prenom        String
+  telephone     String?
+  photoUrl      String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@map("GPOTB02")
+}
+
+// ======================== GPOTB03 — Avoir ========================
+model Avoir {
+  id              String       @id @default(uuid())
+  organisationId  String
+  organisation    Organisation @relation(fields: [organisationId], references: [id])
+  libelle         String
+  valeur          Decimal?
+  description     String?
+  dateAcquisition DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@map("GPOTB03")
+}
+
+// ======================== GPOTB04 — Bénéficiaire ========================
+model Beneficiaire {
+  id            String   @id @default(uuid())
+  adherentId    String
+  adherent      Adherent @relation(fields: [adherentId], references: [id])
+  nom           String
+  prenom        String
+  lienParente   String?
+  dateNaissance DateTime?
+  telephone     String?
+  createdAt     DateTime @default(now())
+
+  @@map("GPOTB04")
+}
+
+// ======================== GPOTB05 — Caisse ========================
+model Caisse {
+  id             String       @id @default(uuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  libelle        String
+  solde          Decimal      @default(0)
+  devise         String       @default("FCFA")
+  actif          Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  transactions  Transaction[]
+  decaissements Decaissement[]
+  dons          Don[]
+
+  @@map("GPOTB05")
+}
+
+// ======================== GPOTB06 — Connexion ========================
+model Connexion {
+  id            String      @id @default(uuid())
+  utilisateurId String
+  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
+  ip            String?
+  userAgent     String?
+  succes        Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+
+  @@map("GPOTB06")
+}
+
+// ======================== GPOTB07 — Cotisation ========================
+model Cotisation {
+  id             String       @id @default(uuid())
+  adherentId     String
+  adherent       Adherent     @relation(fields: [adherentId], references: [id])
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  montant        Decimal
+  periode        String
+  dateEcheance   DateTime
+  datePaiement   DateTime?
+  statut         String       @default("EN_ATTENTE")
+  reference      String?      @unique
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@map("GPOTB07")
+}
+
+// ======================== GPOTB08 — Décaissement ========================
+model Decaissement {
+  id               String       @id @default(uuid())
+  organisationId   String
+  organisation     Organisation @relation(fields: [organisationId], references: [id])
+  caisseId         String?
+  caisse           Caisse?      @relation(fields: [caisseId], references: [id])
+  motif            String
+  montant          Decimal
+  devise           String       @default("FCFA")
+  beneficiaire     String?
+  dateDecaissement DateTime     @default(now())
+  reference        String?
+  validePar        String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@map("GPOTB08")
+}
+
+// ======================== GPOTB09 — Document officiel ========================
+model DocumentOfficiel {
+  id                String       @id @default(uuid())
+  organisationId    String
+  organisation      Organisation @relation(fields: [organisationId], references: [id])
+  type              String
+  numero            String?
+  dateDelivrance    DateTime?
+  dateExpiration    DateTime?
+  autoriteEmettrice String?
+  url               String?
+  valide            Boolean      @default(true)
+  createdAt         DateTime     @default(now())
+
+  @@map("GPOTB09")
+}
+
+// ======================== GPOTB10 — Domaine d'intervention ========================
+model DomaineIntervention {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  libelle   String
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("GPOTB10")
+}
+
+// ======================== GPOTB11 — Don ========================
+model Don {
+  id             String       @id @default(uuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  caisseId       String?
+  caisse         Caisse?      @relation(fields: [caisseId], references: [id])
+  donateur       String?
+  montant        Decimal
+  devise         String       @default("FCFA")
+  dateDon        DateTime     @default(now())
+  objet          String?
+  anonyme        Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+
+  @@map("GPOTB11")
+}
+
+// ======================== GPOTB12 — Être (relation entre adhérents) ========================
+model RelationAdherent {
+  id            String   @id @default(uuid())
+  adherentId    String
+  adherent      Adherent @relation("adherentSource", fields: [adherentId], references: [id])
+  adherentLieId String
+  adherentLie   Adherent @relation("adherentCible", fields: [adherentLieId], references: [id])
+  typeRelation  String
+
+  createdAt DateTime @default(now())
+
+  @@unique([adherentId, adherentLieId, typeRelation])
+  @@map("GPOTB12")
+}
+
+// ======================== GPOTB13 — Événement ========================
+model Evenement {
+  id             String       @id @default(uuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  titre          String
+  description    String?
+  dateDebut      DateTime
+  dateFin        DateTime?
+  lieu           String?
+  type           String?
+  capacite       Int?
+  imageUrl       String?
+  publie         Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  participations EvenementProduit[]
+
+  @@map("GPOTB13")
+}
+
+// ======================== GPOTB14 — Événements produits (participations) ========================
+model EvenementProduit {
+  id          String    @id @default(uuid())
+  evenementId String
+  evenement   Evenement @relation(fields: [evenementId], references: [id])
+  adherentId  String
+  adherent    Adherent  @relation(fields: [adherentId], references: [id])
+  statut      String    @default("INSCRIT")
+  createdAt   DateTime  @default(now())
+
+  @@unique([evenementId, adherentId])
+  @@map("GPOTB14")
+}
+
+// ======================== GPOTB15 — Filiation ========================
+model Filiation {
+  id           String       @id @default(uuid())
+  parentId     String
+  parent       Organisation @relation("orgParent", fields: [parentId], references: [id])
+  enfantId     String
+  enfant       Organisation @relation("orgEnfant", fields: [enfantId], references: [id])
+  typeRelation String?
+  dateDebut    DateTime?
+  dateFin      DateTime?
+  createdAt    DateTime     @default(now())
+
+  @@unique([parentId, enfantId])
+  @@map("GPOTB15")
+}
+
+// ======================== GPOTB16 — Fonction ========================
+model Fonction {
+  id             String       @id @default(uuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  libelle        String
+  description    String?
+  actif          Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+
+  occupations Occuper[]
+
+  @@map("GPOTB16")
+}
+
+// ======================== GPOTB17 — Groupes adhérents ========================
+model GroupeAdherent {
+  id             String       @id @default(uuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  nom            String
+  description    String?
+  actif          Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  membres AppartenanceGroupe[]
+
+  @@map("GPOTB17")
+}
+
+// ======================== GPOTB18 — Habitation ========================
+model Habitation {
+  id           String   @id @default(uuid())
+  adherentId   String   @unique
+  adherent     Adherent @relation(fields: [adherentId], references: [id])
+  adresse      String?
+  quartier     String?
+  ville        String?
+  codePostal   String?
+  pays         String?
+  typeLogement String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("GPOTB18")
+}
+
+// ======================== GPOTB19 — Message ========================
+model Message {
+  id             String        @id @default(uuid())
+  organisationId String?
+  organisation   Organisation? @relation(fields: [organisationId], references: [id])
+  expediteurId   String
+  expediteur     Utilisateur   @relation("messageExp", fields: [expediteurId], references: [id])
+  destinataireId String?
+  destinataire   Utilisateur?  @relation("messageDest", fields: [destinataireId], references: [id])
+  sujet          String?
+  contenu        String
+  lu             Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+
+  @@map("GPOTB19")
+}
+
+// ======================== GPOTB20 — Monnaie / Devise ========================
+model Devise {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  nom       String
+  symbole   String?
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("GPOTB20")
+}
+
+// ======================== GPOTB21 — Newsletter ========================
+model Newsletter {
+  id             String       @id @default(uuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  titre          String
+  contenu        String
+  envoyeA        Int          @default(0)
+  envoye         Boolean      @default(false)
+  dateEnvoi      DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@map("GPOTB21")
+}
+
+// ======================== GPOTB22 — Notification ========================
+model Notification {
+  id            String      @id @default(uuid())
+  utilisateurId String
+  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
+  type          String
+  titre         String
+  message       String
+  lu            Boolean     @default(false)
+  lien          String?
+  createdAt     DateTime    @default(now())
+
+  @@map("GPOTB22")
+}
+
+// ======================== GPOTB23 — Occuper (fonction occupée) ========================
+model Occuper {
+  id         String    @id @default(uuid())
+  adherentId String
+  adherent   Adherent  @relation(fields: [adherentId], references: [id])
+  fonctionId String
+  fonction   Fonction  @relation(fields: [fonctionId], references: [id])
+  dateDebut  DateTime  @default(now())
+  dateFin    DateTime?
+  actif      Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+
+  @@map("GPOTB23")
+}
+
+// ======================== GPOTB28 — Prestation ========================
+model Prestation {
+  id             String       @id @default(uuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  libelle        String
+  description    String?
+  montantMax     Decimal?
+  conditions     String?
+  actif          Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@map("GPOTB28")
+}
+
+// ======================== GPOTB29 — Projet ========================
+model Projet {
+  id             String       @id @default(uuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  titre          String
+  description    String?
+  dateDebut      DateTime?
+  dateFin        DateTime?
+  budget         Decimal?
+  statut         String       @default("EN_COURS")
+  responsable    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@map("GPOTB29")
+}
+
+// ======================== GPOTB30 — Rôle personnalisé ========================
+model RolePersonnalise {
+  id             String       @id @default(uuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  libelle        String
+  description    String?
+  permissions    String[]
+  actif          Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+
+  @@map("GPOTB30")
+}
+
+// ======================== GPOTB31 — Situation matrimoniale ========================
+model SituationMatrimoniale {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  libelle   String
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("GPOTB31")
+}
+
+// ======================== GPOTB32 — Transaction ========================
+model Transaction {
+  id              String       @id @default(uuid())
+  organisationId  String
+  organisation    Organisation @relation(fields: [organisationId], references: [id])
+  caisseId        String?
+  caisse          Caisse?      @relation(fields: [caisseId], references: [id])
+  type            String
+  montant         Decimal
+  devise          String       @default("FCFA")
+  libelle         String
+  reference       String?
+  dateTransaction DateTime     @default(now())
+  createdAt       DateTime     @default(now())
+
+  @@map("GPOTB32")
+}
+
+// ======================== GPOTB33 — Type d'organisation (référentiel) ========================
+model TypeOrganisation {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  libelle   String
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("GPOTB33")
+}
+
+// ======================== GPOTB34 — Demande d'inscription ========================
+model DemandeInscription {
+  id             String        @id @default(uuid())
+  organisationId String?
+  organisation   Organisation? @relation(fields: [organisationId], references: [id])
+  adherentId     String?
+  adherent       Adherent?     @relation(fields: [adherentId], references: [id])
+  type           String
+  statut         String        @default("EN_ATTENTE")
+  donneesJson    Json?
+  traitePar      String?
+  dateTraitement DateTime?
+  motif          String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@map("GPOTB34")
+}
+
+// ======================== GPOTB35 — Référence organisation ========================
+model ReferenceOrganisation {
+  id             String       @id @default(uuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  type           String
+  valeur         String
+  dateDebut      DateTime?
+  dateFin        DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@map("GPOTB35")
+}
+
+// ======================== GPOTB36 — Piste d'audit ========================
+model PisteAudit {
+  id               String      @id @default(uuid())
+  utilisateurId    String?
+  utilisateur      Utilisateur? @relation(fields: [utilisateurId], references: [id])
+  action           String
+  table            String
+  enregistrementId String?
+  ancienneValeur   Json?
+  nouvelleValeur   Json?
+  ip               String?
+  createdAt        DateTime    @default(now())
+
+  @@map("GPOTB36")
+}
+
+// ======================== GPOTB37 — Permission ========================
+model Permission {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  libelle     String
+  description String?
+  module      String?
+  actif       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@map("GPOTB37")
+}
+
+// ======================== GPOTB38 — Appartenance groupe ========================
+model AppartenanceGroupe {
+  id           String         @id @default(uuid())
+  adherentId   String
+  adherent     Adherent       @relation(fields: [adherentId], references: [id])
+  groupeId     String
+  groupe       GroupeAdherent @relation(fields: [groupeId], references: [id])
+  dateAdhesion DateTime       @default(now())
+  actif        Boolean        @default(true)
+
+  @@unique([adherentId, groupeId])
+  @@map("GPOTB38")
 }

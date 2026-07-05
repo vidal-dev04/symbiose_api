@@ -65,11 +65,11 @@ export class AuthService {
         actif: true,
         emailVerifie: true,
         createdAt: true,
-        adminOrgs: { include: { organisation: { select: { id: true, nom: true, type: true } } } },
+        adminOrgs: { include: { organisation: { select: { id: true, nom: true, type: true, logoUrl: true, pays: { select: { id: true, nom: true, armoirieUrl: true } } } } } },
         adherent: {
         select: {
           id: true, nom: true, prenom: true, organisationId: true, statut: true, motifRefus: true,
-          organisation: { select: { id: true, nom: true } },
+          organisation: { select: { id: true, nom: true, logoUrl: true, pays: { select: { id: true, nom: true, armoirieUrl: true } } } },
           tokenPaiements: {
             where: { expireAt: { gt: new Date() } },
             orderBy: { createdAt: 'desc' },

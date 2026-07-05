@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, ConflictException }
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 import { ConfigService } from '@nestjs/config';
+import { NotificationsService } from '../notifications/notifications.service';
 import { v4 as uuid } from 'uuid';
 import * as bcrypt from 'bcryptjs';
 
@@ -11,6 +12,7 @@ export class AdherentsService {
     private prisma: PrismaService,
     private email: EmailService,
     private config: ConfigService,
+    private notifications: NotificationsService,
   ) {}
 
   private generatePassword(length = 10): string {
@@ -40,6 +42,9 @@ export class AdherentsService {
       const adherent = await tx.adherent.create({
         data: { ...adherentData, utilisateurId: utilisateur.id },
       });
+      await tx.membreOrganisation.create({
+        data: { adherentId: adherent.id, organisationId: data.organisationId, statut: 'EN_ATTENTE' },
+      });
       return { adherent, utilisateur };
     });
 
@@ -48,10 +53,24 @@ export class AdherentsService {
     return result.adherent;
   }
 
+  async findAll() {
+    return this.prisma.adherent.findMany({
+      include: { utilisateur: { select: { email: true } }, organisation: { select: { id: true, nom: true, code: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async findByOrganisation(organisationId: string) {
     return this.prisma.adherent.findMany({
       where: { organisationId },
-      include: { utilisateur: { select: { email: true } }, ville: true },
+      include: {
+        utilisateur: { select: { email: true } },
+        ville: true,
+        membres: {
+          where: { organisationId },
+          select: { id: true, statut: true, roleInterne: true, dateAcceptation: true },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -76,6 +95,12 @@ export class AdherentsService {
       data: { statut: 'VALIDE', dateValidation: new Date() },
     });
 
+    await this.prisma.membreOrganisation.upsert({
+      where: { adherentId_organisationId: { adherentId: id, organisationId: adherent.organisationId } },
+      create: { adherentId: id, organisationId: adherent.organisationId, statut: 'ACTIF', dateAcceptation: new Date() },
+      update: { statut: 'ACTIF', dateAcceptation: new Date() },
+    });
+
     const tarifMensuel = this.config.get('TARIF_MENSUEL', 16500);
     const token = uuid();
     await this.prisma.tokenPaiement.create({
@@ -97,6 +122,14 @@ export class AdherentsService {
       tarifMensuel,
     );
 
+    await this.notifications.create(
+      adherent.utilisateurId,
+      'ADHESION_VALIDEE',
+      'Adhésion validée ✅',
+      `Votre adhésion à "${adherent.organisation.nom}" a été validée. Consultez votre email pour payer votre cotisation.`,
+      '/dashboard/mon-adhesion',
+    );
+
     return updated;
   }
 
@@ -114,6 +147,14 @@ export class AdherentsService {
       adherent.organisation.nom,
       motif,
     );
+
+    await this.notifications.create(
+      adherent.utilisateurId,
+      'ADHESION_REFUSEE',
+      'Adhésion refusée ❌',
+      `Votre demande d'adhésion à "${adherent.organisation.nom}" a été refusée. Motif : ${motif}`,
+    );
+
     return updated;
   }
 }

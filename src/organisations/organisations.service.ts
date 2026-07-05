@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 import { IaService } from '../ia/ia.service';
 import { ConfigService } from '@nestjs/config';
+import { NotificationsService } from '../notifications/notifications.service';
 import { v4 as uuid } from 'uuid';
 import * as bcrypt from 'bcryptjs';
 
@@ -13,6 +14,7 @@ export class OrganisationsService {
     private email: EmailService,
     private ia: IaService,
     private config: ConfigService,
+    private notifications: NotificationsService,
   ) {}
 
   private async generateCode(): Promise<string> {
@@ -151,6 +153,17 @@ export class OrganisationsService {
 
     await this.email.sendOrganisationValidee(org.responsableEmail!, org.nom, motDePasse, token, tarifMensuel);
 
+    const responsable = await this.prisma.utilisateur.findUnique({ where: { email: org.responsableEmail! } });
+    if (responsable) {
+      await this.notifications.create(
+        responsable.id,
+        'ORG_VALIDEE',
+        'Organisation validée ✅',
+        `Votre organisation "${org.nom}" a été validée. Consultez votre email pour activer votre compte.`,
+        '/dashboard',
+      );
+    }
+
     return { success: true };
   }
 
@@ -162,6 +175,16 @@ export class OrganisationsService {
 
     await this.prisma.organisation.update({ where: { id }, data: { statut: 'INACTIVE' } });
     await this.email.sendOrganisationRefusee(org.responsableEmail!, org.nom, motif);
+
+    const responsable = await this.prisma.utilisateur.findUnique({ where: { email: org.responsableEmail! } });
+    if (responsable) {
+      await this.notifications.create(
+        responsable.id,
+        'ORG_REFUSEE',
+        'Organisation refusée ❌',
+        `Votre demande pour "${org.nom}" a été refusée. Motif : ${motif}`,
+      );
+    }
 
     return { success: true };
   }
@@ -180,5 +203,51 @@ export class OrganisationsService {
       }),
     ]);
     return { total, parType, parStatut, parPays, totalAdherents, recentOrgs };
+  }
+
+  async analyseIaAll() {
+    const orgs = await this.prisma.organisation.findMany({
+      select: {
+        id: true, nom: true, type: true, statut: true, code: true,
+        scoreIA: true, rapportIA: true, logoUrl: true,
+        pays: { select: { nom: true } },
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return orgs;
+  }
+
+  async analyserOrganisationIA(id: string) {
+    const org = await this.prisma.organisation.findUnique({
+      where: { id },
+      include: { pays: true, ville: true },
+    });
+    if (!org) throw new NotFoundException('Organisation introuvable');
+
+    const result = await this.ia.analyserDossierOrganisation({
+      nom: org.nom,
+      type: org.type,
+      description: org.description ?? undefined,
+      secteurs: org.secteurs ?? [],
+      email: org.email,
+      telephone: org.telephone,
+      responsableNom: org.responsableNom,
+      responsablePrenom: org.responsablePrenom,
+      responsableFonction: org.responsableFonction,
+      pays: org.pays?.nom ?? undefined,
+      ville: org.ville?.nom ?? undefined,
+    });
+
+    if (!result) {
+      return { message: 'Analyse IA non disponible (clé GROQ_API_KEY manquante)', scoreIA: null, rapportIA: null };
+    }
+
+    const updated = await this.prisma.organisation.update({
+      where: { id },
+      data: { scoreIA: result.score, rapportIA: result.rapport },
+      select: { id: true, nom: true, scoreIA: true, rapportIA: true },
+    });
+    return updated;
   }
 }

@@ -4,9 +4,10 @@ import { OrganisationsService } from './organisations.service';
 import { OrganisationsController } from './organisations.controller';
 import { EmailModule } from '../email/email.module';
 import { IaModule } from '../ia/ia.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [EmailModule, IaModule, ConfigModule],
+  imports: [EmailModule, IaModule, ConfigModule, NotificationsModule],
   controllers: [OrganisationsController],
   providers: [OrganisationsService],
   exports: [OrganisationsService],

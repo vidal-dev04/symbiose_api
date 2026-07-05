@@ -232,6 +232,10 @@ export class EmailService {
     `);
   }
 
+  async sendCustomEmail(to: string, subject: string, htmlContent: string): Promise<boolean> {
+    return this.sendEmail(to, subject, htmlContent);
+  }
+
   async sendAdhesionValidee(email: string, orgNom: string, token: string, montant: number) {
     const lien = `${this.frontendUrl}/paiement?token=${token}`;
     return this.sendEmail(email, `Adhésion validée – ${orgNom}`, `
