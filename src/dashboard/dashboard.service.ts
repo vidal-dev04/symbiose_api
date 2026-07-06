@@ -35,6 +35,7 @@ export class DashboardService {
         { label: 'Adhérents', value: totalAdherents, icon: 'people', color: '#F05A22' },
         { label: 'ONG', value: parType.find(p => p.type === 'ONG')?._count ?? 0, icon: 'volunteer_activism', color: '#F05A22' },
         { label: 'Mutuelles', value: parType.find(p => p.type === 'MUTUELLE')?._count ?? 0, icon: 'handshake', color: '#1A1A1A' },
+        { label: 'Associations', value: parType.find(p => p.type === 'ASSOCIATION')?._count ?? 0, icon: 'groups', color: '#F5A623' },
       ],
       parType: parType.map(p => ({ label: p.type, value: p._count })),
       parStatut: parStatut.map(s => ({ label: s.statut, value: s._count })),

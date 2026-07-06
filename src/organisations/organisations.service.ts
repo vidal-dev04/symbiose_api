@@ -189,6 +189,26 @@ export class OrganisationsService {
     return { success: true };
   }
 
+  async renvoyerMailOrganisation(id: string) {
+    const org = await this.findOne(id);
+    if (!org.responsableEmail) throw new BadRequestException('Email responsable manquant');
+
+    if (org.statut === 'ACTIVE') {
+      const tokenPaiement = await this.prisma.tokenPaiement.findFirst({
+        where: { organisationId: id },
+        orderBy: { createdAt: 'desc' },
+      });
+      const tarifMensuel = parseInt(this.config.get('TARIF_MENSUEL', '16500'), 10);
+      const token = tokenPaiement?.token ?? uuid();
+      await this.email.sendOrganisationValidee(org.responsableEmail, org.nom, '(mot de passe inchangé)', token, tarifMensuel);
+    } else if (org.statut === 'EN_ATTENTE') {
+      await this.email.sendInscriptionOrganisation(org.responsableEmail, org.nom);
+    } else {
+      throw new BadRequestException('Impossible de renvoyer un mail pour cette organisation');
+    }
+    return { success: true, message: 'Email renvoyé avec succès' };
+  }
+
   async stats() {
     const [total, parType, parStatut, parPays, totalAdherents, recentOrgs] = await Promise.all([
       this.prisma.organisation.count(),

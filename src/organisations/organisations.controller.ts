@@ -70,6 +70,12 @@ export class OrganisationsController {
     return this.service.refuserOrganisation(id, motif);
   }
 
+  @Post(':id/renvoyer-mail')
+  @Roles(Role.SUPER_ADMIN)
+  renvoyerMail(@Param('id') id: string) {
+    return this.service.renvoyerMailOrganisation(id);
+  }
+
   @Delete(':id')
   @Roles(Role.SUPER_ADMIN)
   delete(@Param('id') id: string) {
