@@ -200,7 +200,13 @@ export class OrganisationsService {
       });
       const tarifMensuel = parseInt(this.config.get('TARIF_MENSUEL', '16500'), 10);
       const token = tokenPaiement?.token ?? uuid();
-      await this.email.sendOrganisationValidee(org.responsableEmail, org.nom, '(mot de passe inchangé)', token, tarifMensuel);
+      const nouveauMotDePasse = this.generatePassword();
+      const hash = await bcrypt.hash(nouveauMotDePasse, 12);
+      await this.prisma.utilisateur.update({
+        where: { email: org.responsableEmail! },
+        data: { motDePasse: hash },
+      });
+      await this.email.sendOrganisationValidee(org.responsableEmail, org.nom, nouveauMotDePasse, token, tarifMensuel);
     } else if (org.statut === 'EN_ATTENTE') {
       await this.email.sendInscriptionOrganisation(org.responsableEmail, org.nom);
     } else {
