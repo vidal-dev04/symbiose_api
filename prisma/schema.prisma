@@ -207,6 +207,8 @@ model Organisation {
   assocDocumentAgrementUrl  String?
   assocReglementUrl         String?
 
+  cotisationMontant Int @default(20000)
+
   rapportIA String?
   scoreIA   Int?
 

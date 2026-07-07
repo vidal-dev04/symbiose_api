@@ -14,10 +14,7 @@ export class PaysService {
   }
 
   async findOne(id: string) {
-    const pays = await this.prisma.pays.findUnique({
-      where: { id },
-      include: { villes: true },
-    });
+    const pays = await this.prisma.pays.findUnique({ where: { id }, include: { villes: true } });
     if (!pays) throw new NotFoundException('Pays introuvable');
     return pays;
   }
@@ -36,7 +33,8 @@ export class PaysService {
   }
 
   async remove(id: string) {
-    return this.prisma.pays.delete({ where: { id } });
+    await this.findOne(id);
+    return this.prisma.pays.update({ where: { id }, data: { actif: false } });
   }
 
   async addVille(paysId: string, nom: string) {

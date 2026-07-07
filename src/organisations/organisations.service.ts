@@ -84,7 +84,7 @@ export class OrganisationsService {
 
     return this.prisma.organisation.findMany({
       where,
-      include: { pays: true, ville: true },
+      include: { pays: true, ville: true, _count: { select: { adherents: true } } },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -187,6 +187,15 @@ export class OrganisationsService {
     }
 
     return { success: true };
+  }
+
+  async updateCotisation(id: string, montant: number) {
+    if (!montant || montant < 0) throw new BadRequestException('Montant invalide');
+    return this.prisma.organisation.update({
+      where: { id },
+      data: { cotisationMontant: montant },
+      select: { id: true, nom: true, cotisationMontant: true },
+    });
   }
 
   async renvoyerMailOrganisation(id: string) {

@@ -30,14 +30,14 @@ export class AdherentsService {
     const existing = await this.prisma.utilisateur.findUnique({ where: { email: emailAdherent } });
     if (existing) throw new ConflictException('Un compte avec cet email existe déjà');
 
-    const motDePasse = this.generatePassword();
-    const hash = await bcrypt.hash(motDePasse, 12);
+    const motDePasseTemp = this.generatePassword();
+    const hash = await bcrypt.hash(motDePasseTemp, 12);
 
     const { email: _email, ...adherentData } = data;
 
     const result = await this.prisma.$transaction(async (tx) => {
       const utilisateur = await tx.utilisateur.create({
-        data: { email: emailAdherent, motDePasse: hash, role: 'ADHERENT', actif: true },
+        data: { email: emailAdherent, motDePasse: hash, role: 'ADHERENT', actif: false },
       });
       const adherent = await tx.adherent.create({
         data: { ...adherentData, utilisateurId: utilisateur.id },
@@ -48,7 +48,7 @@ export class AdherentsService {
       return { adherent, utilisateur };
     });
 
-    await this.email.sendInscriptionAdherent(emailAdherent, org.nom, motDePasse);
+    await this.email.sendInscriptionAdherent(emailAdherent, org.nom);
 
     return result.adherent;
   }
@@ -101,7 +101,8 @@ export class AdherentsService {
       update: { statut: 'ACTIF', dateAcceptation: new Date() },
     });
 
-    const tarifMensuel = this.config.get('TARIF_MENSUEL', 16500);
+    const orgAvecMontant = await this.prisma.organisation.findUnique({ where: { id: adherent.organisationId }, select: { cotisationMontant: true } });
+    const montantCotisation = orgAvecMontant?.cotisationMontant ?? parseInt(this.config.get('TARIF_MENSUEL', '20000'), 10);
     const token = uuid();
     await this.prisma.tokenPaiement.create({
       data: {
@@ -109,7 +110,7 @@ export class AdherentsService {
         email: adherent.utilisateur.email,
         organisationId: adherent.organisationId,
         adherentId: adherent.id,
-        montant: tarifMensuel,
+        montant: montantCotisation,
         periode: 'MOIS',
         expireAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },
@@ -119,7 +120,7 @@ export class AdherentsService {
       adherent.utilisateur.email,
       adherent.organisation.nom,
       token,
-      tarifMensuel,
+      montantCotisation,
     );
 
     await this.notifications.create(

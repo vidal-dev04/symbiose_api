@@ -201,18 +201,35 @@ export class EmailService {
     `);
   }
 
-  async sendInscriptionAdherent(email: string, orgNom: string, motDePasse: string) {
-    return this.sendEmail(email, `Demande d'adhésion enregistrée – ${orgNom}`, `
+  async sendInscriptionAdherent(email: string, orgNom: string) {
+    return this.sendEmail(email, `Demande d'adhésion reçue – ${orgNom}`, `
       <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">${this.logoSvg}<span style="font-size:20px;font-weight:bold;color:#F05A22;">Symbiose Pays</span></div>
         <p>Bonjour,</p>
         <p>Votre demande d'adhésion à <strong>${orgNom}</strong> a bien été enregistrée.</p>
-        <p>Voici vos identifiants de connexion :</p>
+        <div style="background:#fff8e1;border-left:4px solid #F05A22;border-radius:4px;padding:16px;margin:20px 0;">
+          <p style="margin:0;color:#e65100;font-weight:600;">Dossier en cours de vérification</p>
+          <p style="margin:8px 0 0;color:#333;font-size:0.9rem;">L'administrateur va examiner votre dossier. Si vos informations sont validées, vous recevrez un lien de paiement pour finaliser votre adhésion.</p>
+        </div>
+        <p style="font-size:0.85rem;color:#888;">Ce processus prend généralement moins de 48h ouvrables.</p>
+      </div>
+    `);
+  }
+
+  async sendAccesAdherent(email: string, orgNom: string, motDePasse: string) {
+    return this.sendEmail(email, `Vos accès – ${orgNom}`, `
+      <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">${this.logoSvg}<span style="font-size:20px;font-weight:bold;color:#F05A22;">Symbiose Pays</span></div>
+        <p>Bonjour,</p>
+        <p>Votre paiement a été confirmé. Votre adhésion à <strong>${orgNom}</strong> est maintenant <strong style="color:#2e7d32;">active</strong> !</p>
+        <p>Voici vos identifiants pour accéder à votre espace :</p>
         <div style="background:#f5f5f5;border-radius:8px;padding:16px;margin:20px 0;">
           <p style="margin:4px 0;"><strong>Email :</strong> ${email}</p>
           <p style="margin:4px 0;"><strong>Mot de passe :</strong> <code style="background:#e0e0e0;padding:2px 6px;border-radius:4px;">${motDePasse}</code></p>
         </div>
-        <p>L'administrateur de l'organisation va vérifier votre dossier. Si vos informations sont validées, vous recevrez un lien de paiement pour finaliser votre adhésion.</p>
+        <p style="text-align:center;margin:28px 0;">
+          <a href="${this.frontendUrl}/login" style="background:#F05A22;color:#fff;padding:14px 32px;border-radius:12px;text-decoration:none;font-weight:700;">Accéder à mon espace</a>
+        </p>
         <p style="font-size:0.85rem;color:#888;">Nous vous recommandons de changer votre mot de passe après votre première connexion.</p>
       </div>
     `);

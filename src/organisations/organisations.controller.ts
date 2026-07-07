@@ -14,6 +14,7 @@ export class OrganisationsController {
     return this.service.create(data);
   }
 
+  @Public()
   @Get()
   findAll(
     @Query('type') type?: string,
@@ -68,6 +69,12 @@ export class OrganisationsController {
   @Roles(Role.SUPER_ADMIN)
   refuser(@Param('id') id: string, @Body('motif') motif: string) {
     return this.service.refuserOrganisation(id, motif);
+  }
+
+  @Patch(':id/cotisation')
+  @Roles(Role.ADMIN_ORG, Role.SUPER_ADMIN)
+  updateCotisation(@Param('id') id: string, @Body('montant') montant: number) {
+    return this.service.updateCotisation(id, montant);
   }
 
   @Post(':id/renvoyer-mail')

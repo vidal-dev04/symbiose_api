@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 import { ConfigService } from '@nestjs/config';
 import { v4 as uuid } from 'uuid';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class PaiementsService {
@@ -14,6 +15,11 @@ export class PaiementsService {
     private config: ConfigService,
   ) {
     this.tarifMensuel = parseInt(this.config.get('TARIF_MENSUEL', '16500'), 10);
+  }
+
+  private generatePassword(length = 10): string {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#';
+    return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
   }
 
   calculerMontant(periode: string): number {
@@ -177,22 +183,30 @@ export class PaiementsService {
       const adherent = await this.prisma.adherent.findUnique({
         where: { id: tokenPaiement.adherentId },
         include: {
-          utilisateur: { select: { email: true } },
+          utilisateur: { select: { id: true, email: true } },
           organisation: { select: { nom: true } },
         },
       });
       if (!adherent) throw new NotFoundException('Adhérent introuvable');
 
-      await this.prisma.adherent.update({
-        where: { id: adherent.id },
-        data: { statut: 'ACTIF' as any },
-      });
+      const nouveauMotDePasse = this.generatePassword();
+      const hash = await bcrypt.hash(nouveauMotDePasse, 12);
 
-      await this.email.sendPaiementConfirme(
+      await this.prisma.$transaction([
+        this.prisma.adherent.update({
+          where: { id: adherent.id },
+          data: { statut: 'ACTIF' as any },
+        }),
+        this.prisma.utilisateur.update({
+          where: { id: adherent.utilisateur.id },
+          data: { motDePasse: hash, actif: true },
+        }),
+      ]);
+
+      await this.email.sendAccesAdherent(
         adherent.utilisateur.email,
-        tokenPaiement.montant,
-        tokenPaiement.periode,
-        '',
+        adherent.organisation.nom,
+        nouveauMotDePasse,
       );
 
       return { success: true, type: 'adherent' };
