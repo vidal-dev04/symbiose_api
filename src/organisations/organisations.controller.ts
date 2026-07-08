@@ -71,6 +71,12 @@ export class OrganisationsController {
     return this.service.refuserOrganisation(id, motif);
   }
 
+  @Patch(':id/renouveler')
+  @Roles(Role.SUPER_ADMIN)
+  renouveler(@Param('id') id: string) {
+    return this.service.renouvelerOrganisation(id);
+  }
+
   @Patch(':id/cotisation')
   @Roles(Role.ADMIN_ORG, Role.SUPER_ADMIN)
   updateCotisation(@Param('id') id: string, @Body('montant') montant: number) {

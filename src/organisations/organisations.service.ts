@@ -84,7 +84,7 @@ export class OrganisationsService {
 
     return this.prisma.organisation.findMany({
       where,
-      include: { pays: true, ville: true, _count: { select: { adherents: true } } },
+      include: { pays: true, ville: true, abonnement: true, _count: { select: { adherents: true } } },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -101,7 +101,17 @@ export class OrganisationsService {
       },
     });
     if (!org) throw new NotFoundException('Organisation introuvable');
-    return org;
+
+    const tokenPaiement = await this.prisma.tokenPaiement.findFirst({
+      where: { organisationId: id, utilise: false, expireAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const joursRestants = tokenPaiement
+      ? Math.max(0, Math.ceil((new Date(tokenPaiement.expireAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+      : null;
+
+    return { ...org, tokenPaiement: tokenPaiement ?? null, joursRestants };
   }
 
   async update(id: string, data: any) {
@@ -183,6 +193,68 @@ export class OrganisationsService {
         'ORG_REFUSEE',
         'Organisation refusée ❌',
         `Votre demande pour "${org.nom}" a été refusée. Motif : ${motif}`,
+      );
+    }
+
+    return { success: true };
+  }
+
+  async renouvelerOrganisation(id: string) {
+    const org = await this.findOne(id);
+    if (org.statut !== 'INACTIVE') {
+      throw new BadRequestException('Seules les organisations inactives peuvent être renouvelées');
+    }
+
+    const tarifMensuel = parseInt(this.config.get('TARIF_MENSUEL', '16500'), 10);
+    const token = uuid();
+    const motDePasse = this.generatePassword();
+    const hash = await bcrypt.hash(motDePasse, 12);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.organisation.update({ where: { id }, data: { statut: 'ACTIVE' } });
+      await tx.utilisateur.update({
+        where: { email: org.responsableEmail! },
+        data: { motDePasse: hash, actif: true },
+      });
+      // Renouveler ou créer l'abonnement
+      await tx.abonnement.upsert({
+        where: { organisationId: id },
+        update: {
+          statut: 'ACTIF',
+          dateDebut: new Date(),
+          dateFin: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        },
+        create: {
+          organisationId: id,
+          statut: 'ACTIF',
+          montant: tarifMensuel,
+          periode: 'MOIS',
+          dateDebut: new Date(),
+          dateFin: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        },
+      });
+      await tx.tokenPaiement.create({
+        data: {
+          token,
+          email: org.responsableEmail!,
+          organisationId: id,
+          montant: tarifMensuel,
+          periode: 'MOIS',
+          expireAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        },
+      });
+    });
+
+    await this.email.sendOrganisationValidee(org.responsableEmail!, org.nom, motDePasse, token, tarifMensuel);
+
+    const responsable = await this.prisma.utilisateur.findUnique({ where: { email: org.responsableEmail! } });
+    if (responsable) {
+      await this.notifications.create(
+        responsable.id,
+        'ORG_VALIDEE',
+        'Abonnement renouvelé ✅',
+        `L'abonnement de votre organisation "${org.nom}" a été renouvelé. Consultez votre email pour vous connecter.`,
+        '/dashboard',
       );
     }
 

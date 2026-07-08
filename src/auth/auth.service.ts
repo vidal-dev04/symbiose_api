@@ -40,6 +40,35 @@ export class AuthService {
 
     if (!user.actif) throw new UnauthorizedException('Votre compte est inactif');
 
+    // Pour les admins d'organisation : vérifier l'abonnement
+    if (user.role === 'ADMIN_ORG') {
+      const adminOrg = await this.prisma.adminOrganisation.findFirst({
+        where: { utilisateurId: user.id },
+        include: { organisation: { include: { abonnement: true } } },
+      });
+
+      const abonnement = adminOrg?.organisation?.abonnement;
+      if (abonnement) {
+        const now = new Date();
+        // Auto-marquer comme EXPIRE si dateFin dépassée
+        if (abonnement.dateFin < now && abonnement.statut !== 'EXPIRE' && abonnement.statut !== 'ANNULE') {
+          await this.prisma.abonnement.update({
+            where: { id: abonnement.id },
+            data: { statut: 'EXPIRE' },
+          });
+          await this.prisma.organisation.update({
+            where: { id: adminOrg!.organisationId },
+            data: { statut: 'INACTIVE' },
+          });
+        }
+        if (abonnement.dateFin < now || abonnement.statut === 'EXPIRE' || abonnement.statut === 'ANNULE') {
+          throw new UnauthorizedException(
+            `L'abonnement de votre organisation a expiré le ${abonnement.dateFin.toLocaleDateString('fr-FR')}. Veuillez contacter l'administrateur pour renouveler votre abonnement.`
+          );
+        }
+      }
+    }
+
     await this.prisma.utilisateur.update({
       where: { id: user.id },
       data: { derniereConnexion: new Date() },
