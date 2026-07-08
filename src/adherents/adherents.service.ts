@@ -15,6 +15,17 @@ export class AdherentsService {
     private notifications: NotificationsService,
   ) {}
 
+  private mapTypePiece(value: string): string {
+    const map: Record<string, string> = {
+      "CNI (Carte Nationale d'Identité)": 'CNI',
+      'Passeport': 'PASSEPORT',
+      'Permis de conduire': 'PERMIS',
+      'Carte de résident': 'CARTE_RESIDENT',
+      'Autre': 'AUTRE',
+    };
+    return map[value] ?? value;
+  }
+
   private generatePassword(length = 10): string {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#';
     return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
@@ -30,10 +41,41 @@ export class AdherentsService {
     const existing = await this.prisma.utilisateur.findUnique({ where: { email: emailAdherent } });
     if (existing) throw new ConflictException('Un compte avec cet email existe déjà');
 
+    // Resolve villeId from ville name + pays code
+    let villeId: string | undefined;
+    if (data.ville && data.pays) {
+      const villeObj = await this.prisma.ville.findFirst({
+        where: { nom: { equals: data.ville, mode: 'insensitive' }, pays: { code: data.pays } },
+      });
+      if (villeObj) villeId = villeObj.id;
+    }
+
+    const adherentData: any = {
+      organisationId: data.organisationId,
+      nom: data.nom,
+      prenom: data.prenom,
+      ...(data.dateNaissance ? { dateNaissance: new Date(data.dateNaissance) } : {}),
+      ...(data.sexe ? { genre: data.sexe } : {}),
+      telephone: data.telephone,
+      ...(data.photoUrl ? { photoUrl: data.photoUrl } : {}),
+      ...(villeId ? { villeId } : {}),
+      ...(data.quartier ? { quartier: data.quartier } : {}),
+      ...(data.profession ? { profession: data.profession } : {}),
+      ...(data.nomEmployeur ? { employeur: data.nomEmployeur } : {}),
+      ...(data.typePiece ? { typePiece: this.mapTypePiece(data.typePiece) } : {}),
+      ...(data.numeroPiece ? { numeroPiece: data.numeroPiece } : {}),
+      ...(data.dateDelivrancePiece ? { dateDelivrancePiece: new Date(data.dateDelivrancePiece) } : {}),
+      ...(data.lieuDelivrancePiece ? { lieuDelivrancePiece: data.lieuDelivrancePiece } : {}),
+      ...(data.pieceRectoUrl ? { pieceRectoUrl: data.pieceRectoUrl } : {}),
+      ...(data.pieceVersoUrl ? { pieceVersoUrl: data.pieceVersoUrl } : {}),
+      interets: Array.isArray(data.centresInteret) ? data.centresInteret : [],
+      ...(data.motivation ? { motivation: data.motivation } : {}),
+      accepteReglement: data.accepteReglement ?? false,
+      accepteConfidentialite: data.accepteConfidentialite ?? false,
+    };
+
     const motDePasseTemp = this.generatePassword();
     const hash = await bcrypt.hash(motDePasseTemp, 12);
-
-    const { email: _email, ...adherentData } = data;
 
     const result = await this.prisma.$transaction(async (tx) => {
       const utilisateur = await tx.utilisateur.create({
