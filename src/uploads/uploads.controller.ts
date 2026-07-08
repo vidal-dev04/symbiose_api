@@ -6,31 +6,24 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname, join } from 'path';
-import { existsSync, mkdirSync } from 'fs';
+import { memoryStorage } from 'multer';
+import { extname } from 'path';
 import { Public } from '../common/decorators/public.decorator';
 import { ApiTags, ApiConsumes, ApiBody } from '@nestjs/swagger';
-
-const uploadDir = join(process.cwd(), 'uploads');
-if (!existsSync(uploadDir)) mkdirSync(uploadDir, { recursive: true });
+import { CloudinaryService } from './cloudinary.service';
 
 @ApiTags('uploads')
 @Controller('uploads')
 export class UploadsController {
+  constructor(private readonly cloudinary: CloudinaryService) {}
+
   @Post()
   @Public()
   @ApiConsumes('multipart/form-data')
   @ApiBody({ schema: { type: 'object', properties: { file: { type: 'string', format: 'binary' } } } })
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: uploadDir,
-        filename: (_req, file, cb) => {
-          const unique = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
-          cb(null, `${unique}${extname(file.originalname)}`);
-        },
-      }),
+      storage: memoryStorage(),
       limits: { fileSize: 10 * 1024 * 1024 },
       fileFilter: (_req, file, cb) => {
         const allowed = /jpeg|jpg|png|gif|webp|pdf|doc|docx/i;
@@ -42,9 +35,9 @@ export class UploadsController {
       },
     }),
   )
-  uploadFile(@UploadedFile() file: Express.Multer.File) {
+  async uploadFile(@UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('Aucun fichier reçu');
-    const baseUrl = process.env.API_URL || 'http://localhost:3000/api';
-    return { url: `${baseUrl}/uploads/${file.filename}`, filename: file.filename };
+    const result = await this.cloudinary.uploadFile(file.buffer, file.originalname, file.mimetype);
+    return { url: result.secure_url, filename: result.public_id };
   }
 }
