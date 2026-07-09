@@ -92,6 +92,20 @@ export class AdherentsService {
 
     await this.email.sendInscriptionAdherent(emailAdherent, org.nom);
 
+    const admins = await this.prisma.adminOrganisation.findMany({
+      where: { organisationId: data.organisationId },
+      select: { utilisateurId: true },
+    });
+    for (const admin of admins) {
+      await this.notifications.create(
+        admin.utilisateurId,
+        'NOUVELLE_DEMANDE_ADHESION',
+        'Nouvelle demande d\'adhésion 👤',
+        `${data.prenom} ${data.nom} a soumis une demande d'adhésion à votre organisation.`,
+        '/dashboard/mes-adherents',
+      );
+    }
+
     return result.adherent;
   }
 
