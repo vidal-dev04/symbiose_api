@@ -10,8 +10,11 @@ async function bootstrap() {
 
   app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/api/uploads' });
 
+  const allowedOrigins = ['http://localhost:4200', 'http://localhost:4201'];
+  if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL);
+
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:4200',
+    origin: allowedOrigins,
     credentials: true,
   });
 
