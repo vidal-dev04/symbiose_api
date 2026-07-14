@@ -293,13 +293,19 @@ model Adherent {
   nom          String
   prenom       String
   dateNaissance DateTime?
+  lieuNaissance String?
+  nationalite   String?
   genre        String?
+  situationMatrimoniale String?
   telephone    String?
   photoUrl     String?
 
   villeId  String?
   ville    Ville? @relation(fields: [villeId], references: [id])
   quartier String?
+  adresse  String?
+
+  secteurActivite String?
 
   profession String?
   employeur  String?
