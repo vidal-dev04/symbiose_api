@@ -75,16 +75,17 @@ export class CotisationsService {
     });
   }
 
-  async findGlobal(filters?: { statut?: string; organisationId?: string; periode?: string }) {
+  async findGlobal(filters?: { statut?: string; organisationId?: string; periode?: string; paysId?: string }) {
     const where: any = {};
     if (filters?.statut) where.statut = filters.statut;
     if (filters?.organisationId) where.organisationId = filters.organisationId;
     if (filters?.periode) where.periode = { contains: filters.periode, mode: 'insensitive' };
+    if (filters?.paysId) where.organisation = { paysId: filters.paysId };
     return this.prisma.cotisation.findMany({
       where,
       include: {
         adherent: { select: { nom: true, prenom: true } },
-        organisation: { select: { nom: true, code: true, type: true } },
+        organisation: { select: { nom: true, code: true, type: true, pays: { select: { id: true, nom: true, code: true } } } },
       },
       orderBy: { createdAt: 'desc' },
       take: 500,

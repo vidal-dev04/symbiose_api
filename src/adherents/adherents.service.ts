@@ -31,6 +31,12 @@ export class AdherentsService {
     return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
   }
 
+  private async generateNumero(): Promise<string> {
+    const annee = new Date().getFullYear();
+    const count = await this.prisma.adherent.count();
+    return `ADH-${annee}-${String(count + 1).padStart(4, '0')}`;
+  }
+
   async create(data: any) {
     const org = await this.prisma.organisation.findUnique({ where: { id: data.organisationId } });
     if (!org) throw new NotFoundException('Organisation introuvable');
@@ -76,13 +82,14 @@ export class AdherentsService {
 
     const motDePasseTemp = this.generatePassword();
     const hash = await bcrypt.hash(motDePasseTemp, 12);
+    const numero = await this.generateNumero();
 
     const result = await this.prisma.$transaction(async (tx) => {
       const utilisateur = await tx.utilisateur.create({
         data: { email: emailAdherent, motDePasse: hash, role: 'ADHERENT', actif: false },
       });
       const adherent = await tx.adherent.create({
-        data: { ...adherentData, utilisateurId: utilisateur.id },
+        data: { ...adherentData, numero, utilisateurId: utilisateur.id },
       });
       await tx.membreOrganisation.create({
         data: { adherentId: adherent.id, organisationId: data.organisationId, statut: 'EN_ATTENTE' },
@@ -111,7 +118,10 @@ export class AdherentsService {
 
   async findAll() {
     return this.prisma.adherent.findMany({
-      include: { utilisateur: { select: { email: true } }, organisation: { select: { id: true, nom: true, code: true } } },
+      include: {
+        utilisateur: { select: { email: true } },
+        organisation: { select: { id: true, nom: true, code: true, pays: { select: { id: true, nom: true } } } },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -213,5 +223,15 @@ export class AdherentsService {
     );
 
     return updated;
+  }
+
+  async update(id: string, data: { nom?: string; prenom?: string }) {
+    await this.findOne(id);
+    return this.prisma.adherent.update({ where: { id }, data });
+  }
+
+  async remove(id: string) {
+    await this.findOne(id);
+    return this.prisma.adherent.update({ where: { id }, data: { statut: 'INACTIF' } });
   }
 }

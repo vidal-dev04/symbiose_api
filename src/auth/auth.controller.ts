@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -30,5 +30,10 @@ export class AuthController {
   @Get('me')
   me(@CurrentUser('id') userId: string) {
     return this.auth.me(userId);
+  }
+
+  @Patch('me/photo')
+  updatePhoto(@CurrentUser('id') userId: string, @Body('photoUrl') photoUrl: string) {
+    return this.auth.updatePhoto(userId, photoUrl);
   }
 }

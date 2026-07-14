@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Patch, Param, Body, Query } from '@nestjs/common';
 import { CotisationsService } from './cotisations.service';
 import { Roles } from '../common/decorators/roles.decorator';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { Role } from '@prisma/client';
 
 @Controller('cotisations')
@@ -31,16 +32,19 @@ export class CotisationsController {
 
   @Get('global')
   @Roles(Role.SUPER_ADMIN)
+  @RequirePermission('cotisations.voir')
   findGlobal(
     @Query('statut') statut?: string,
     @Query('organisationId') organisationId?: string,
     @Query('periode') periode?: string,
+    @Query('paysId') paysId?: string,
   ) {
-    return this.service.findGlobal({ statut, organisationId, periode });
+    return this.service.findGlobal({ statut, organisationId, periode, paysId });
   }
 
   @Get('global/stats')
   @Roles(Role.SUPER_ADMIN)
+  @RequirePermission('cotisations.voir')
   statsGlobal() {
     return this.service.statsGlobal();
   }

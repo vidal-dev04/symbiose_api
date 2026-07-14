@@ -19,16 +19,19 @@ export class EmailService {
     this.apiKey = this.config.get('BREVO_API_KEY', '');
     this.senderEmail = this.config.get('BREVO_SENDER_EMAIL', 'noreply@symbiosepays.com');
     this.senderName = this.config.get('BREVO_SENDER_NAME', 'Symbiose Pays');
-    this.frontendUrl = this.config.get('FRONTEND_URL', 'http://localhost:4200');
+    this.frontendUrl = this.config.get('FRONTEND_URL', 'http://localhost:4200').trim();
     this.gmailUser = this.config.get('EMAIL_USER', '');
     this.gmailPass = this.config.get('EMAIL_PASS', '');
 
     if (this.gmailUser && this.gmailPass) {
       this.transporter = nodemailer.createTransport({
-        service: 'gmail',
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
+        family: 4,
         auth: { user: this.gmailUser, pass: this.gmailPass },
         tls: { rejectUnauthorized: false },
-      });
+      } as any);
     }
   }
 

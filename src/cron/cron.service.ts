@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
+import { StatutOpportunite } from '@prisma/client';
 
 @Injectable()
 export class CronService {
@@ -64,5 +65,22 @@ export class CronService {
     }
 
     this.logger.log(`${essais.length} essai(s) expiré(s) traité(s).`);
+  }
+
+  @Cron(CronExpression.EVERY_MINUTE)
+  async publierProchaineOpportunite() {
+    const prochaine = await this.prisma.opportunite.findFirst({
+      where: { statut: StatutOpportunite.BROUILLON },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (!prochaine) return;
+
+    await this.prisma.opportunite.update({
+      where: { id: prochaine.id },
+      data: { statut: StatutOpportunite.PUBLIEE, datePublication: new Date() },
+    });
+
+    this.logger.log(`Opportunité publiée automatiquement : "${prochaine.titre}"`);
   }
 }

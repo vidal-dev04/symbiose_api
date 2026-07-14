@@ -20,8 +20,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: { sub: string; email: string; role: string }) {
     const user = await this.prisma.utilisateur.findUnique({
       where: { id: payload.sub },
+      include: { groupe: true },
     });
     if (!user || !user.actif) throw new UnauthorizedException('Compte inactif ou inexistant');
-    return { id: user.id, email: user.email, role: user.role };
+    return {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      groupeId: user.groupeId,
+      permissions: user.groupe?.permissions ?? null,
+    };
   }
 }

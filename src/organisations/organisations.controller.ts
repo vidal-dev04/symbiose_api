@@ -2,6 +2,7 @@ import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Query } from '@
 import { OrganisationsService } from './organisations.service';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Public } from '../common/decorators/public.decorator';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { Role } from '@prisma/client';
 
 @Controller('organisations')
@@ -32,12 +33,14 @@ export class OrganisationsController {
 
   @Get('analyse-ia')
   @Roles(Role.SUPER_ADMIN)
+  @RequirePermission('analyse_ia.voir')
   analyseIaAll() {
     return this.service.analyseIaAll();
   }
 
   @Post(':id/analyser-ia')
   @Roles(Role.SUPER_ADMIN)
+  @RequirePermission('analyse_ia.voir')
   analyserIa(@Param('id') id: string) {
     return this.service.analyserOrganisationIA(id);
   }

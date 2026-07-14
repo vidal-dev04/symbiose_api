@@ -32,7 +32,6 @@ import { DeviseModule } from './devise/devise.module';
 import { DomainesInterventionModule } from './domaines-intervention/domaines-intervention.module';
 import { SituationsMatrimonialesModule } from './situations-matrimoniales/situations-matrimoniales.module';
 import { OccuperModule } from './occuper/occuper.module';
-import { DemandesInscriptionModule } from './demandes-inscription/demandes-inscription.module';
 import { HabitationModule } from './habitation/habitation.module';
 import { RelationAdherentModule } from './relation-adherent/relation-adherent.module';
 import { AppartenanceGroupeModule } from './appartenance-groupe/appartenance-groupe.module';
@@ -40,8 +39,24 @@ import { EvenementProduitModule } from './evenement-produit/evenement-produit.mo
 import { TypeOrganisationModule } from './type-organisation/type-organisation.module';
 import { MembresOrganisationModule } from './membres-organisation/membres-organisation.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { OpportunitesModule } from './opportunites/opportunites.module';
+import { GroupesUtilisateursModule } from './groupes-utilisateurs/groupes-utilisateurs.module';
+import { ComptesModule } from './comptes/comptes.module';
+import { LienParenteModule } from './lien-parente/lien-parente.module';
+import { CategoriePrestationModule } from './categorie-prestation/categorie-prestation.module';
+import { TypePrestataireModule } from './type-prestataire/type-prestataire.module';
+import { TypeMutuelleModule } from './type-mutuelle/type-mutuelle.module';
+import { TypeAssociationModule } from './type-association/type-association.module';
+import { PrestationMutuelleModule } from './prestation-mutuelle/prestation-mutuelle.module';
+import { SourceFinancementModule } from './source-financement/source-financement.module';
+import { BudgetAnnuelModule } from './budget-annuel/budget-annuel.module';
+import { SecteurActiviteModule } from './secteur-activite/secteur-activite.module';
+import { CentreInteretModule } from './centre-interet/centre-interet.module';
+import { CategorieAdherentModule } from './categorie-adherent/categorie-adherent.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
+import { PermissionsGuard } from './common/guards/permissions.guard';
+import { RootGuard } from './common/guards/root.guard';
 
 @Module({
   imports: [
@@ -75,7 +90,6 @@ import { RolesGuard } from './common/guards/roles.guard';
     DomainesInterventionModule,
     SituationsMatrimonialesModule,
     OccuperModule,
-    DemandesInscriptionModule,
     HabitationModule,
     RelationAdherentModule,
     AppartenanceGroupeModule,
@@ -83,12 +97,28 @@ import { RolesGuard } from './common/guards/roles.guard';
     TypeOrganisationModule,
     MembresOrganisationModule,
     DashboardModule,
+    OpportunitesModule,
+    GroupesUtilisateursModule,
+    ComptesModule,
+    LienParenteModule,
+    CategoriePrestationModule,
+    TypePrestataireModule,
+    TypeMutuelleModule,
+    TypeAssociationModule,
+    PrestationMutuelleModule,
+    SourceFinancementModule,
+    BudgetAnnuelModule,
+    SecteurActiviteModule,
+    CentreInteretModule,
+    CategorieAdherentModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_GUARD, useClass: RootGuard },
+    { provide: APP_GUARD, useClass: PermissionsGuard },
   ],
 })
 export class AppModule {}

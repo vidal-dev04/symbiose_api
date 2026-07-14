@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
@@ -94,11 +94,16 @@ export class AuthService {
         actif: true,
         emailVerifie: true,
         createdAt: true,
+        groupeId: true,
+        groupe: { select: { id: true, code: true, libelle: true, permissions: true } },
         adminOrgs: { include: { organisation: { select: { id: true, nom: true, type: true, logoUrl: true, pays: { select: { id: true, nom: true, armoirieUrl: true } } } } } },
         adherent: {
         select: {
-          id: true, nom: true, prenom: true, organisationId: true, statut: true, motifRefus: true,
+          id: true, numero: true, nom: true, prenom: true, organisationId: true, statut: true, motifRefus: true,
+          photoUrl: true, telephone: true, quartier: true, profession: true, genre: true, dateNaissance: true,
+          ville: { select: { id: true, nom: true } },
           organisation: { select: { id: true, nom: true, logoUrl: true, pays: { select: { id: true, nom: true, armoirieUrl: true } } } },
+          membres: { select: { roleInterne: true, statut: true, dateAdhesion: true, dateAcceptation: true } },
           tokenPaiements: {
             where: { expireAt: { gt: new Date() } },
             orderBy: { createdAt: 'desc' },
@@ -107,10 +112,26 @@ export class AuthService {
           },
         },
       },
+      administrateur: { select: { id: true, nom: true, prenom: true, photoUrl: true, telephone: true } },
       },
     });
     if (!user) throw new UnauthorizedException('Utilisateur introuvable');
     return user;
+  }
+
+  async updatePhoto(userId: string, photoUrl: string) {
+    const user = await this.prisma.utilisateur.findUnique({ where: { id: userId }, select: { role: true } });
+    if (!user) throw new UnauthorizedException('Utilisateur introuvable');
+
+    if (user.role === 'ADHERENT') {
+      await this.prisma.adherent.update({ where: { utilisateurId: userId }, data: { photoUrl } });
+    } else if (user.role === 'SUPER_ADMIN') {
+      await this.prisma.administrateur.update({ where: { utilisateurId: userId }, data: { photoUrl } });
+    } else {
+      throw new BadRequestException("La photo de profil n'est pas disponible pour ce rôle");
+    }
+
+    return this.me(userId);
   }
 
   private async generateTokens(userId: string, email: string, role: string) {

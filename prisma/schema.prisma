@@ -58,6 +58,18 @@ enum StatutAbonnement {
   ANNULE
 }
 
+enum TypeOpportunite {
+  SUBVENTION
+  APPEL
+  ENTREPRISE
+  BENEVOLE
+}
+
+enum StatutOpportunite {
+  BROUILLON
+  PUBLIEE
+}
+
 enum PeriodeAbonnement {
   MOIS
   TRIMESTRE
@@ -87,6 +99,12 @@ enum TypePiece {
   AUTRE
 }
 
+enum TypeDon {
+  ESPECE
+  MOBILE_MONEY
+  NATURE
+}
+
 // ======================== MODELES ========================
 
 model Pays {
@@ -95,12 +113,16 @@ model Pays {
   nom         String
   drapeau     String?
   armoirieUrl String?
+  langue      String?
+  deviseId    String?
+  devise      Devise?  @relation(fields: [deviseId], references: [id])
   actif       Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   villes        Ville[]
   organisations Organisation[]
+  opportunites  Opportunite[]
 
   @@map("GPOTB26")
 }
@@ -131,6 +153,9 @@ model Utilisateur {
   derniereConnexion DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
+
+  groupeId String?
+  groupe   GroupeUtilisateur? @relation(fields: [groupeId], references: [id])
 
   adherent  Adherent?
   adminOrgs AdminOrganisation[]
@@ -236,7 +261,6 @@ model Organisation {
   prestations          Prestation[]
   projets              Projet[]
   rolesPerso           RolePersonnalise[]
-  demandesInscription  DemandeInscription[]
   references           ReferenceOrganisation[]
   transactions         Transaction[]
   caisses              Caisse[]
@@ -259,6 +283,7 @@ model AdminOrganisation {
 
 model Adherent {
   id             String         @id @default(uuid())
+  numero         String?        @unique
   utilisateurId  String         @unique
   utilisateur    Utilisateur    @relation(fields: [utilisateurId], references: [id])
   organisationId String
@@ -303,7 +328,6 @@ model Adherent {
   participations       EvenementProduit[]
   habitation           Habitation?
   occupations          Occuper[]
-  demandesInscription  DemandeInscription[]
   appartenancesGroupes AppartenanceGroupe[]
 
   membres              MembreOrganisation[]
@@ -332,7 +356,7 @@ model MembreOrganisation {
   updatedAt      DateTime      @updatedAt
 
   @@unique([adherentId, organisationId])
-  @@map("membre_organisation")
+  @@map("GPOTB57")
 }
 
 model Abonnement {
@@ -559,11 +583,13 @@ model Don {
   organisation   Organisation @relation(fields: [organisationId], references: [id])
   caisseId       String?
   caisse         Caisse?      @relation(fields: [caisseId], references: [id])
+  type           TypeDon      @default(ESPECE)
   donateur       String?
-  montant        Decimal
+  montant        Decimal?
   devise         String       @default("FCFA")
   dateDon        DateTime     @default(now())
   objet          String?
+  numeroMobile   String?
   anonyme        Boolean      @default(false)
   createdAt      DateTime     @default(now())
 
@@ -711,6 +737,8 @@ model Devise {
   actif     Boolean  @default(true)
   createdAt DateTime @default(now())
 
+  pays Pays[]
+
   @@map("GPOTB20")
 }
 
@@ -847,25 +875,6 @@ model TypeOrganisation {
   @@map("GPOTB33")
 }
 
-// ======================== GPOTB34 — Demande d'inscription ========================
-model DemandeInscription {
-  id             String        @id @default(uuid())
-  organisationId String?
-  organisation   Organisation? @relation(fields: [organisationId], references: [id])
-  adherentId     String?
-  adherent       Adherent?     @relation(fields: [adherentId], references: [id])
-  type           String
-  statut         String        @default("EN_ATTENTE")
-  donneesJson    Json?
-  traitePar      String?
-  dateTraitement DateTime?
-  motif          String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-
-  @@map("GPOTB34")
-}
-
 // ======================== GPOTB35 — Référence organisation ========================
 model ReferenceOrganisation {
   id             String       @id @default(uuid())
@@ -921,4 +930,162 @@ model AppartenanceGroupe {
 
   @@unique([adherentId, groupeId])
   @@map("GPOTB38")
+}
+
+// ======================== GPOTB45 — Groupe utilisateur (rôle interne + permissions) ========================
+model GroupeUtilisateur {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  libelle     String
+  description String?
+  permissions String[]
+  actif       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  utilisateurs Utilisateur[]
+
+  @@map("GPOTB45")
+}
+
+// ======================== GPOTB46 — Lien de parenté (référentiel Bénéficiaire) ========================
+model LienParente {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  libelle   String
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("GPOTB46")
+}
+
+// ======================== GPOTB47 — Catégorie de prestation (référentiel) ========================
+model CategoriePrestation {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  libelle   String
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("GPOTB47")
+}
+
+// ======================== GPOTB48 — Type de prestataire (référentiel) ========================
+model TypePrestataire {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  libelle   String
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("GPOTB48")
+}
+
+// ======================== GPOTB49 — Type de mutuelle (référentiel) ========================
+model TypeMutuelle {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  libelle   String
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("GPOTB49")
+}
+
+// ======================== GPOTB50 — Type d'association (référentiel) ========================
+model TypeAssociation {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  libelle   String
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("GPOTB50")
+}
+
+// ======================== GPOTB51 — Prestation mutuelle (référentiel) ========================
+model PrestationMutuelle {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  libelle   String
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("GPOTB51")
+}
+
+// ======================== GPOTB52 — Source de financement (référentiel) ========================
+model SourceFinancement {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  libelle   String
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("GPOTB52")
+}
+
+// ======================== GPOTB53 — Budget annuel (référentiel) ========================
+model BudgetAnnuel {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  libelle   String
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("GPOTB53")
+}
+
+// ======================== GPOTB54 — Secteur d'activité (référentiel adhérent) ========================
+model SecteurActivite {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  libelle   String
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("GPOTB54")
+}
+
+// ======================== GPOTB55 — Centre d'intérêt (référentiel adhérent) ========================
+model CentreInteret {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  libelle   String
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("GPOTB55")
+}
+
+// ======================== GPOTB56 — Catégorie d'adhérent (référentiel) ========================
+model CategorieAdherent {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  libelle   String
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("GPOTB56")
+}
+
+// ======================== GPOTB44 — Opportunité ========================
+model Opportunite {
+  id              String            @id @default(uuid())
+  titre           String
+  organisme       String
+  description     String
+  type            TypeOpportunite   @default(SUBVENTION)
+  secteur         String
+  paysId          String?
+  pays            Pays?             @relation(fields: [paysId], references: [id])
+  montant         String?
+  dateLimite      DateTime?
+  lienSource      String?
+  statut          StatutOpportunite @default(BROUILLON)
+  datePublication DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@map("GPOTB44")
 }
